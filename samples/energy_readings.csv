@@ -1,0 +1,8 @@
+timestamp,metric,value,unit
+2025-09-01T00:00:00Z,energy,150.500,kWh
+2025-09-02T00:00:00Z,energy,170.200,kWh
+2025-09-03T00:00:00Z,energy,160.750,kWh
+2025-09-04T00:00:00Z,energy,155.300,kWh
+2025-09-05T00:00:00Z,energy,180.000,kWh
+2025-09-06T00:00:00Z,energy,190.650,kWh
+2025-09-07T00:00:00Z,energy,175.000,kWh
