@@ -16,6 +16,9 @@ APP_KEY=<gerada para o ambiente>
 APP_URL=https://<dominio-backend>
 LOG_CHANNEL=stderr
 LOG_LEVEL=info
+CACHE_STORE=file
+SESSION_DRIVER=array
+QUEUE_CONNECTION=sync
 DB_CONNECTION=mysql
 DB_HOST=${{MySQL.MYSQLHOST}}
 DB_PORT=${{MySQL.MYSQLPORT}}
@@ -27,7 +30,7 @@ DEMO_ADMIN_EMAIL=<definido no ambiente>
 DEMO_ADMIN_PASSWORD=<definido no ambiente>
 ```
 
-`APP_KEY`, credenciais e senhas devem existir somente no gerenciador de variáveis da Railway.
+`APP_KEY`, credenciais e senhas devem existir somente no gerenciador de variáveis da Railway. O predeploy executa `php artisan migrate --seed --force`, garantindo que as migrations e a conta demo sejam sincronizadas em uma única execução.
 
 ## Variável de build do frontend
 
