@@ -34,7 +34,8 @@ class AlertController extends Controller
         $alerts = $daily
             ->groupBy(fn ($item) => CarbonImmutable::parse($item->date)->format('o-W'))
             ->flatMap(function ($week) {
-                $threshold = (float) $week->avg('total') * 1.3;
+                $weekAverage = (float) $week->avg('total');
+                $threshold = $weekAverage * 1.3;
 
                 return $week
                     ->filter(fn ($item) => (float) $item->total > $threshold)
@@ -42,6 +43,10 @@ class AlertController extends Controller
                         'date' => $item->date,
                         'total_kwh' => round((float) $item->total, 3),
                         'threshold_kwh' => round($threshold, 3),
+                        'week_avg_kwh' => round($weekAverage, 3),
+                        'percent_over' => $weekAverage > 0
+                            ? round((((float) $item->total - $weekAverage) / $weekAverage) * 100, 1)
+                            : 0,
                     ]);
             })
             ->values();

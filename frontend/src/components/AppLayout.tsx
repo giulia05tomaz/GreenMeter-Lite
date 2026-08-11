@@ -12,6 +12,11 @@ export default function AppLayout() {
 
   return (
     <div className="app-shell">
+      {user?.is_demo && (
+        <div className="demo-banner" role="status">
+          Ambiente demonstrativo com dados fictícios — alterações estão bloqueadas.
+        </div>
+      )}
       <header className="topbar">
         <NavLink to="/dashboard" className="brand" aria-label="GreenMeter Lite">
           <span className="brand-mark" aria-hidden="true">G</span>
@@ -22,6 +27,7 @@ export default function AppLayout() {
           <NavLink to="/upload">Importar CSV</NavLink>
         </nav>
         <div className="user-menu">
+          {user?.is_demo && <span className="demo-badge">DEMO</span>}
           <span className="user-name">{user?.name}</span>
           <button className="button button-ghost" onClick={handleLogout}>Sair</button>
         </div>
