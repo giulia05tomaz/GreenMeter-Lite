@@ -2,35 +2,36 @@
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 
 uses(RefreshDatabase::class);
 
-it('rejects invalid login', function () {
-    $user = User::factory()->create([
-        'email' => 'test@example.com',
-        'password' => Hash::make('password'),
-    ]);
+it('rejects invalid credentials without exposing details', function () {
+    User::factory()->create(['email' => 'test@example.com', 'password' => 'correct-password']);
 
-    $response = $this->postJson('/api/auth/login', [
+    $this->postJson('/api/auth/login', [
         'email' => 'test@example.com',
         'password' => 'wrong-password',
-    ]);
-
-    $response->assertStatus(401);
+    ])->assertUnauthorized()->assertExactJson(['message' => 'Credenciais inválidas.']);
 });
 
-it('logs in successfully', function () {
-    $user = User::factory()->create([
+it('issues a sanctum token for valid credentials', function () {
+    User::factory()->create([
+        'name' => 'Test User',
         'email' => 'test@example.com',
-        'password' => Hash::make('password'),
+        'password' => 'correct-password',
     ]);
 
-    $response = $this->postJson('/api/auth/login', [
+    $this->postJson('/api/auth/login', [
         'email' => 'test@example.com',
-        'password' => 'password',
+        'password' => 'correct-password',
+    ])->assertOk()->assertJsonStructure([
+        'token',
+        'user' => ['name', 'email'],
     ]);
 
-    $response->assertStatus(200);
-    $response->assertJsonStructure(['token']);
+    expect(User::first()->tokens)->toHaveCount(1);
+});
+
+it('requires authentication for protected endpoints', function () {
+    $this->getJson('/api/dashboard/kpis')->assertUnauthorized();
 });

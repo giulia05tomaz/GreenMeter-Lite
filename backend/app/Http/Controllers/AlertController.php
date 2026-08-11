@@ -2,57 +2,50 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Carbon\Carbon;
+use App\Http\Requests\DashboardFilterRequest;
 use App\Models\Reading;
+use Carbon\CarbonImmutable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 class AlertController extends Controller
 {
-    /**
-     * Return a list of dates where daily consumption exceeds 130 % of the weekly average.
-     */
-    public function index(Request $request)
+    public function index(DashboardFilterRequest $request): JsonResponse
     {
-        $from = $request->query('from');
-        $to = $request->query('to');
+        $filters = $request->validated();
+        $query = Reading::query()
+            ->where('user_id', $request->user()->id)
+            ->where('metric', 'energy')
+            ->where('unit', 'kWh');
 
-        $query = Reading::query();
-        if ($from) {
-            $query->where('ts', '>=', Carbon::parse($from));
+        if (isset($filters['from'])) {
+            $query->where('ts', '>=', CarbonImmutable::parse($filters['from'])->startOfDay());
         }
-        if ($to) {
-            $query->where('ts', '<=', Carbon::parse($to));
+        if (isset($filters['to'])) {
+            $query->where('ts', '<=', CarbonImmutable::parse($filters['to'])->endOfDay());
         }
 
-        // Daily totals for the given range
         $daily = $query
             ->select(DB::raw('DATE(ts) as date'), DB::raw('SUM(value) as total'))
             ->groupBy('date')
             ->orderBy('date')
             ->get();
 
-        if ($daily->isEmpty()) {
-            return response()->json([]);
-        }
+        $alerts = $daily
+            ->groupBy(fn ($item) => CarbonImmutable::parse($item->date)->format('o-W'))
+            ->flatMap(function ($week) {
+                $threshold = (float) $week->avg('total') * 1.3;
 
-        // Determine a reference week to compute the average. Use the first day in range.
-        $weekStart = Carbon::parse($from ?? $daily->first()->date)->startOfWeek();
-        $weekEnd = Carbon::parse($from ?? $daily->first()->date)->endOfWeek();
-
-        $weekData = Reading::query()
-            ->whereBetween('ts', [$weekStart, $weekEnd])
-            ->select(DB::raw('DATE(ts) as date'), DB::raw('SUM(value) as total'))
-            ->groupBy('date')
-            ->get();
-
-        $weeklyAvg = $weekData->avg('total') ?: 0;
-        $threshold = $weeklyAvg * 1.3;
-
-        $peaks = $daily->filter(fn($item) => $item->total > $threshold)
-            ->map(fn($item) => $item->date)
+                return $week
+                    ->filter(fn ($item) => (float) $item->total > $threshold)
+                    ->map(fn ($item) => [
+                        'date' => $item->date,
+                        'total_kwh' => round((float) $item->total, 3),
+                        'threshold_kwh' => round($threshold, 3),
+                    ]);
+            })
             ->values();
 
-        return response()->json($peaks);
+        return response()->json($alerts);
     }
 }

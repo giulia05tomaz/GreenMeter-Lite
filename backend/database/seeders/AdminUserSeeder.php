@@ -2,20 +2,25 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Database\Seeder;
 
 class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
-        User::updateOrCreate(
-            ['email' => 'admin@demo.com'],
-            [
-                'name' => 'Admin',
-                'password' => Hash::make('admin123'),
-            ]
+        $email = config('demo.admin_email');
+        $password = config('demo.admin_password');
+
+        if (! $email || ! $password) {
+            $this->command?->warn('Demo user not created: configure DEMO_ADMIN_EMAIL and DEMO_ADMIN_PASSWORD locally.');
+
+            return;
+        }
+
+        User::query()->updateOrCreate(
+            ['email' => $email],
+            ['name' => 'Demo Admin', 'password' => $password]
         );
     }
 }

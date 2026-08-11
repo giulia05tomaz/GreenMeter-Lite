@@ -2,77 +2,64 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Reading;
+use App\Http\Requests\DashboardFilterRequest;
 use App\Models\EmissionFactor;
-use Carbon\Carbon;
+use App\Models\Reading;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    /**
-     * Return KPI aggregates: total energy (kWh), total CO₂e (t) and daily average (kWh).
-     */
-    public function kpis(Request $request)
+    public function kpis(DashboardFilterRequest $request): JsonResponse
     {
-        $from = $request->query('from');
-        $to = $request->query('to');
-
-        $query = Reading::query();
-        if ($from) {
-            $query->where('ts', '>=', Carbon::parse($from));
-        }
-        if ($to) {
-            $query->where('ts', '<=', Carbon::parse($to));
-        }
-
-        $totalEnergyKwh = (float) $query->sum('value');
-
-        $factor = EmissionFactor::where('metric', 'energy')->first();
-        $totalCO2e = $factor ? $totalEnergyKwh * (float) $factor->factor : 0;
-
-        $days = (int) $query->select(DB::raw('DATE(ts) as date'))->groupBy('date')->count();
-        $dailyAvg = $days > 0 ? $totalEnergyKwh / $days : 0;
+        $query = $this->readings($request);
+        $totalEnergyKwh = (float) (clone $query)->sum('value');
+        $days = (int) (clone $query)
+            ->selectRaw('COUNT(DISTINCT DATE(ts)) as aggregate')
+            ->value('aggregate');
+        $factor = (float) (EmissionFactor::query()->where('metric', 'energy')->value('factor') ?? 0);
 
         return response()->json([
-            'total_energy_kwh' => $totalEnergyKwh,
-            'total_co2e_t' => $totalCO2e,
-            'daily_avg_kwh' => $dailyAvg,
+            'total_energy_kwh' => round($totalEnergyKwh, 3),
+            'total_co2e_t' => round($totalEnergyKwh * $factor, 8),
+            'daily_avg_kwh' => $days > 0 ? round($totalEnergyKwh / $days, 3) : 0,
         ]);
     }
 
-    /**
-     * Return a daily series of kWh and CO₂e.
-     */
-    public function series(Request $request)
+    public function series(DashboardFilterRequest $request): JsonResponse
     {
-        $from = $request->query('from');
-        $to = $request->query('to');
-
-        $query = Reading::query();
-        if ($from) {
-            $query->where('ts', '>=', Carbon::parse($from));
-        }
-        if ($to) {
-            $query->where('ts', '<=', Carbon::parse($to));
-        }
-
-        $factor = EmissionFactor::where('metric', 'energy')->first();
-
-        $series = $query
+        $factor = (float) (EmissionFactor::query()->where('metric', 'energy')->value('factor') ?? 0);
+        $series = $this->readings($request)
             ->select(DB::raw('DATE(ts) as date'), DB::raw('SUM(value) as kwh'))
             ->groupBy('date')
             ->orderBy('date')
             ->get()
-            ->map(function ($item) use ($factor) {
-                $kwh = (float) $item->kwh;
-                return [
-                    'date' => $item->date,
-                    'kwh' => $kwh,
-                    'co2e' => $factor ? $kwh * (float) $factor->factor : 0,
-                ];
-            });
+            ->map(fn ($item) => [
+                'date' => $item->date,
+                'kwh' => round((float) $item->kwh, 3),
+                'co2e' => round((float) $item->kwh * $factor, 8),
+            ]);
 
         return response()->json($series);
+    }
+
+    private function readings(DashboardFilterRequest $request): Builder
+    {
+        $filters = $request->validated();
+        $query = Reading::query()
+            ->where('user_id', $request->user()->id)
+            ->where('metric', 'energy')
+            ->where('unit', 'kWh');
+
+        if (isset($filters['from'])) {
+            $query->where('ts', '>=', CarbonImmutable::parse($filters['from'])->startOfDay());
+        }
+        if (isset($filters['to'])) {
+            $query->where('ts', '<=', CarbonImmutable::parse($filters['to'])->endOfDay());
+        }
+
+        return $query;
     }
 }

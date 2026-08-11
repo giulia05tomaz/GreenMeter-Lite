@@ -10,12 +10,16 @@ return new class extends Migration
     {
         Schema::create('readings', function (Blueprint $table) {
             $table->id();
-            $table->string('metric');
-            $table->decimal('value', 12, 3);
-            $table->string('unit');
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->timestamp('ts');
-            $table->string('source')->nullable();
+            $table->string('metric', 32);
+            $table->decimal('value', 12, 3);
+            $table->string('unit', 16);
+            $table->string('source', 32)->nullable();
             $table->timestamps();
+
+            $table->index(['user_id', 'ts']);
+            $table->index(['user_id', 'metric']);
         });
     }
 

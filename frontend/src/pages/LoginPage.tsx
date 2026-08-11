@@ -1,60 +1,84 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
+import { useState, type FormEvent } from 'react'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../auth/AuthContext'
+import { apiErrorMessage } from '../lib/api'
 
-const LoginPage: React.FC = () => {
+export default function LoginPage() {
+  const { authenticated, login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  if (authenticated) return <Navigate to="/dashboard" replace />
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setSubmitting(true)
     setError('')
+
     try {
-      const response = await axios.post('/api/auth/login', { email, password })
-      // Store token; Sanctum cookie is set via backend (if configured)
-      localStorage.setItem('token', response.data.token)
-      navigate('/upload')
-    } catch (err: any) {
-      setError('Login failed')
+      await login(email, password)
+      const destination = (location.state as { from?: string } | null)?.from || '/dashboard'
+      navigate(destination, { replace: true })
+    } catch (requestError) {
+      setError(apiErrorMessage(requestError, 'Não foi possível entrar. Tente novamente.'))
+    } finally {
+      setSubmitting(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="bg-white p-8 rounded shadow-md w-96">
-        <h1 className="text-xl font-bold mb-4 text-center">Login</h1>
-        {error && <p className="text-red-500 mb-4">{error}</p>}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium">Email</label>
+    <main className="login-page">
+      <section className="login-story">
+        <a href="/" className="brand brand-light" aria-label="GreenMeter Lite">
+          <span className="brand-mark" aria-hidden="true">G</span>
+          <span>GreenMeter <strong>Lite</strong></span>
+        </a>
+        <div>
+          <p className="eyebrow">Energia sob controle</p>
+          <h1>Transforme leituras de consumo em decisões mais conscientes.</h1>
+          <p>Importe dados, acompanhe emissões estimadas e identifique picos em um painel simples.</p>
+        </div>
+        <p className="story-note">MVP de portfólio com dados demonstrativos — não substitui inventário ambiental certificado.</p>
+      </section>
+
+      <section className="login-panel" aria-labelledby="login-heading">
+        <form className="auth-card" onSubmit={handleSubmit}>
+          <p className="eyebrow">Acesso ao painel</p>
+          <h2 id="login-heading">Bem-vinda de volta</h2>
+          <p className="muted">Use a conta configurada no seu ambiente local.</p>
+
+          {error && <div className="alert alert-error" role="alert">{error}</div>}
+
+          <label className="field">
+            <span>E-mail</span>
             <input
               type="email"
+              autoComplete="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2"
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="voce@exemplo.com"
+              required
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Password</label>
+          </label>
+          <label className="field">
+            <span>Senha</span>
             <input
               type="password"
+              autoComplete="current-password"
               value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2"
+              onChange={(event) => setPassword(event.target.value)}
+              required
             />
-          </div>
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
-          >
-            Login
+          </label>
+          <button className="button button-primary button-block" disabled={submitting}>
+            {submitting ? 'Entrando…' : 'Entrar'}
           </button>
         </form>
-      </div>
-    </div>
+      </section>
+    </main>
   )
 }
-
-export default LoginPage

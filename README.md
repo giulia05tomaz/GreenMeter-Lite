@@ -1,24 +1,76 @@
 # GreenMeter Lite
 
-GreenMeter Lite is a minimal MVP to track and visualise energy consumption and associated carbon emissions. It consists of a Laravel 11 backend (PHP 8.3) and a React frontend (Vite + TypeScript).
+MVP full stack para importar leituras de energia, acompanhar consumo e estimar emissões associadas. O projeto demonstra uma API REST autenticada, ingestão segura de CSV, isolamento de dados por usuário, visualização de séries temporais e uma regra simples para destacar picos semanais.
 
-## Backend
+> Projeto de portfólio com dados demonstrativos. As estimativas não substituem um inventário de emissões certificado.
 
-- **Laravel 11** using Sanctum for authentication.
-- **Models**:
-  - `Reading` for time‑stamped consumption values.
-  - `EmissionFactor` defines conversion factors (e.g. `0.000053 tCO₂e/kWh`).
-- **Endpoints**:
-  - **`POST /api/auth/login`** – Authenticates a user and returns a Sanctum token.
-  - **`POST /api/readings/upload`** – Accepts a CSV file (`timestamp`, `metric`, `value`, `unit`) and bulk‑inserts rows.
-  - **`GET /api/dashboard/kpis?from=YYYY‑MM‑DD&to=YYYY‑MM‑DD`** – Returns aggregate totals for energy (kWh), CO₂e (t) and daily average.
-  - **`GET /api/dashboard/series?from=&to=`** – Returns a daily series (date, kWh, CO₂e).
-  - **`GET /api/alerts?from=&to=`** – Returns days where the daily average energy exceeds 130 % of the weekly average.
+## O que o produto entrega
 
-- **Database migrations** define tables for users, readings and emission factors. A seed inserts the energy emission factor and an admin user (`admin@demo.com` / `admin123`).
-- **Tests** written with [Pest](https://pestphp.com) cover authentication and CSV uploads.
+- Login com tokens Laravel Sanctum, limite de tentativas e revogação no logout.
+- Importação atômica de CSV com cabeçalho, tipo, tamanho, quantidade de linhas e valores validados.
+- KPIs de energia total, CO₂e estimado e média diária.
+- Série diária de consumo e alertas quando um dia supera em 30% a média da própria semana.
+- Separação das leituras por usuário autenticado.
+- Interface responsiva e acessível em português.
+- Testes automatizados no backend e no frontend, executados no GitHub Actions.
+- Ambiente reproduzível com Docker Compose.
 
-To set up locally:
+## Stack
+
+| Camada | Tecnologias |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite, TanStack Query, Chart.js, Axios |
+| Backend | PHP 8.3, Laravel 13, Sanctum, Pest |
+| Dados | MySQL 8.4 em desenvolvimento; SQLite em memória nos testes |
+| Qualidade | Vitest, Testing Library, Laravel Pint, GitHub Actions |
+| Infra local | Docker e Docker Compose |
+
+## Arquitetura
+
+```mermaid
+flowchart LR
+    U["Pessoa usuária"] --> SPA["React SPA"]
+    SPA -->|"HTTPS + Bearer token"| API["Laravel REST API"]
+    API --> AUTH["Sanctum"]
+    API --> IMPORT["CSV importer"]
+    API --> DASH["Dashboard queries"]
+    AUTH --> DB[("MySQL")]
+    IMPORT --> DB
+    DASH --> DB
+```
+
+A descrição das decisões e dos limites do MVP está em [docs/architecture.md](docs/architecture.md).
+
+## Executar com Docker
+
+Pré-requisitos: Docker Desktop e Docker Compose.
+
+```bash
+cp .env.example .env
+```
+
+Defina valores locais fortes para `DB_PASSWORD` e `DB_ROOT_PASSWORD`. Em seguida:
+
+```bash
+docker compose build
+docker run --rm greenmeter-lite-backend php artisan key:generate --show
+```
+
+Copie o valor exibido para `APP_KEY` no arquivo `.env`. Para criar uma conta local de demonstração, preencha também `DEMO_ADMIN_EMAIL` e `DEMO_ADMIN_PASSWORD`. Depois execute:
+
+```bash
+docker compose up
+```
+
+- Frontend: `http://localhost:5173`
+- API: `http://localhost:8000`
+- Health check: `http://localhost:8000/up`
+
+Nenhuma credencial pública é criada por padrão.
+
+## Executar sem Docker
+
+### Backend
 
 ```bash
 cd backend
@@ -29,39 +81,79 @@ php artisan migrate --seed
 php artisan serve
 ```
 
-This will create the necessary tables and seed the emission factor and admin user. Use the supplied credentials to obtain an API token.
+Configure o MySQL no `backend/.env`. A conta demo é opcional e depende das variáveis `DEMO_ADMIN_EMAIL` e `DEMO_ADMIN_PASSWORD`.
 
-### Docker (optional)
+### Frontend
 
-A `docker-compose.yml` is provided. It builds a `php-fpm` service for the backend and a `node` service for the frontend. To run:
-
-```bash
-docker compose up --build
-```
-
-The Laravel app will be available at `http://localhost:8000`, and the React app at `http://localhost:5173`.
-
-## Frontend
-
-The React frontend uses Vite and TypeScript. React Query handles API requests and state, and Tailwind CSS provides a minimal layout. There are three screens:
-
-- **Login** – Prompts for email and password and stores the Sanctum token in local storage.
-- **Upload** – Lets an authenticated user upload a CSV file. It shows success or error messages.
-- **Dashboard** – Shows three cards with totals, a daily line chart (via [Chart.js](https://www.chartjs.org/)) and a table of peak‑day alerts.
-
-To run locally:
+Requer Node.js 22.22.2 ou superior.
 
 ```bash
 cd frontend
-npm install
+cp .env.example .env
+npm ci
 npm run dev
 ```
 
-## Sample data
+## Formato do CSV
 
-The `/samples` directory contains an example CSV file (`energy_readings.csv`) with columns `timestamp`, `metric`, `value` and `unit`.
+```csv
+timestamp,metric,value,unit
+2026-01-01T00:00:00Z,energy,12.5,kWh
+```
 
-## Design considerations
+Regras do MVP:
 
-- **CSV ingestion** – The MVP assumes CSV is the simplest way for users to bring historical readings into the system. In a real‑world application this would be replaced or augmented with automated data sources.
-- **Peak alert logic** – A “peak day” is flagged when that day’s energy consumption is greater than 130 % of the weekly average consumption. This simple heuristic highlights unusual spikes without complex analytics.
+- arquivo CSV/TXT de até 2 MB;
+- no máximo 10.000 leituras por importação;
+- `metric` deve ser `energy` e `unit` deve ser `kWh`;
+- `value` deve ser numérico e não negativo;
+- uma linha inválida cancela toda a importação.
+
+Um arquivo válido está disponível em [`samples/energy_readings.csv`](samples/energy_readings.csv).
+
+## API
+
+| Método | Rota | Proteção | Função |
+| --- | --- | --- | --- |
+| `POST` | `/api/auth/login` | Pública + rate limit | Autentica e emite token |
+| `GET` | `/api/auth/user` | Sanctum | Retorna a pessoa autenticada |
+| `POST` | `/api/auth/logout` | Sanctum | Revoga o token atual |
+| `POST` | `/api/readings/upload` | Sanctum | Valida e importa CSV |
+| `GET` | `/api/dashboard/kpis` | Sanctum | Retorna KPIs por período |
+| `GET` | `/api/dashboard/series` | Sanctum | Retorna série diária |
+| `GET` | `/api/alerts` | Sanctum | Retorna picos semanais |
+
+Os endpoints de consulta aceitam `from` e `to` no formato `YYYY-MM-DD`.
+
+## Qualidade
+
+```bash
+# Backend
+cd backend && composer check
+
+# Frontend
+cd frontend && npm run check
+```
+
+O workflow em `.github/workflows/ci.yml` executa lint, testes, typecheck e build em todo push para `main` e em pull requests.
+
+## Segurança e privacidade
+
+- O token fica apenas em memória no frontend; não é persistido em `localStorage`.
+- Uploads têm limites e validação antes da transação no banco.
+- As consultas sempre filtram pelo usuário autenticado.
+- Segredos e arquivos `.env` são ignorados pelo Git.
+- Credenciais de demonstração não são publicadas no repositório.
+- Vulnerabilidades devem ser reportadas conforme [SECURITY.md](SECURITY.md).
+
+## Limites atuais e próximos passos
+
+- Não há cadastro ou recuperação de senha; contas são provisionadas pelo ambiente no MVP.
+- O fator de emissão é demonstrativo e precisa de fonte/versionamento antes de uso real.
+- A detecção de pico é uma heurística, não um modelo estatístico.
+- Deploy público ainda não está configurado.
+- Próximas evoluções: OpenAPI, paginação/histórico de importações, observabilidade e testes end-to-end.
+
+## Material de entrevista
+
+As decisões, trade-offs e perguntas prováveis estão resumidos em [`INTERVIEW_GUIDE.md`](INTERVIEW_GUIDE.md).

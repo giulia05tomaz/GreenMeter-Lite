@@ -10,10 +10,10 @@ return new class extends Migration
     {
         Schema::create('emission_factors', function (Blueprint $table) {
             $table->id();
-            $table->string('metric');
-            $table->decimal('factor', 12, 6);
-            $table->string('unit_in');
-            $table->string('unit_out');
+            $table->string('metric', 32)->unique();
+            $table->decimal('factor', 14, 8);
+            $table->string('unit_in', 16);
+            $table->string('unit_out', 16);
             $table->timestamps();
         });
     }

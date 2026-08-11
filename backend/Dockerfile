@@ -1,33 +1,25 @@
-FROM php:8.3-fpm-alpine
+FROM php:8.3-cli-alpine AS runtime
 
-# Install system dependencies
-RUN apk add --no-cache \
-        git \
-        curl \
-        libpng \
-        libpng-dev \
-        oniguruma-dev \
-        autoconf \
-        make \
-        gcc \
-        g++ \
-        icu-dev \
-        zip \
-        unzip \
-        bash \
-        mysql-client \
-    && docker-php-ext-install pdo pdo_mysql
+RUN apk add --no-cache icu-dev libzip-dev unzip \
+    && docker-php-ext-install intl pdo_mysql zip
 
-# Copy Composer from official image
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
 WORKDIR /var/www/html
-
-COPY . .
-
-RUN composer install --no-interaction --prefer-dist && \
-    php artisan key:generate || true
-
 EXPOSE 8000
 
+FROM runtime AS development
+COPY composer.json composer.lock ./
+RUN composer install --no-interaction --prefer-dist --no-scripts
+COPY . .
+RUN composer dump-autoload --optimize
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+
+FROM runtime AS production
+ENV APP_ENV=production
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --prefer-dist --no-scripts --optimize-autoloader
+COPY . .
+RUN composer dump-autoload --no-dev --optimize \
+    && chown -R www-data:www-data storage bootstrap/cache
+USER www-data
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
