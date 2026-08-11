@@ -1,0 +1,32 @@
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useAuth } from '../auth/AuthContext'
+
+export default function AppLayout() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login', { replace: true })
+  }
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <NavLink to="/dashboard" className="brand" aria-label="GreenMeter Lite">
+          <span className="brand-mark" aria-hidden="true">G</span>
+          <span>GreenMeter <strong>Lite</strong></span>
+        </NavLink>
+        <nav className="nav-links" aria-label="Navegação principal">
+          <NavLink to="/dashboard">Dashboard</NavLink>
+          <NavLink to="/upload">Importar CSV</NavLink>
+        </nav>
+        <div className="user-menu">
+          <span className="user-name">{user?.name}</span>
+          <button className="button button-ghost" onClick={handleLogout}>Sair</button>
+        </div>
+      </header>
+      <main className="page-container"><Outlet /></main>
+    </div>
+  )
+}

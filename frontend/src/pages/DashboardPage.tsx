@@ -1,83 +1,141 @@
-import React from 'react'
-import { useQuery } from 'react-query'
-import axios from 'axios'
-import { Line } from 'react-chartjs-2'
+import { useQuery } from '@tanstack/react-query'
 import {
-  Chart as ChartJS,
-  LineElement,
-  PointElement,
-  LinearScale,
   CategoryScale,
-  Tooltip,
+  Chart as ChartJS,
+  Filler,
   Legend,
+  LineElement,
+  LinearScale,
+  PointElement,
+  Tooltip,
 } from 'chart.js'
+import { Line } from 'react-chartjs-2'
+import { Link, useLocation } from 'react-router-dom'
+import { api } from '../lib/api'
 
-ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend)
+ChartJS.register(CategoryScale, Filler, Legend, LineElement, LinearScale, PointElement, Tooltip)
 
-const DashboardPage: React.FC = () => {
-  const { data: kpis } = useQuery('kpis', async () => {
-    const response = await axios.get('/api/dashboard/kpis')
-    return response.data
+type Kpis = {
+  total_energy_kwh: number
+  total_co2e_t: number
+  daily_avg_kwh: number
+}
+type SeriesPoint = { date: string; kwh: number; co2e: number }
+type PeakAlert = { date: string; total_kwh: number; threshold_kwh: number }
+
+const number = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 })
+const co2 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 6 })
+
+export default function DashboardPage() {
+  const location = useLocation()
+  const imported = Boolean((location.state as { imported?: boolean } | null)?.imported)
+  const kpis = useQuery({
+    queryKey: ['kpis'],
+    queryFn: async () => (await api.get<Kpis>('/dashboard/kpis')).data,
+  })
+  const series = useQuery({
+    queryKey: ['series'],
+    queryFn: async () => (await api.get<SeriesPoint[]>('/dashboard/series')).data,
+  })
+  const alerts = useQuery({
+    queryKey: ['alerts'],
+    queryFn: async () => (await api.get<PeakAlert[]>('/alerts')).data,
   })
 
-  const { data: series } = useQuery('series', async () => {
-    const response = await axios.get('/api/dashboard/series')
-    return response.data
-  })
-
-  const { data: alerts } = useQuery('alerts', async () => {
-    const response = await axios.get('/api/alerts')
-    return response.data
-  })
-
+  const loading = kpis.isLoading || series.isLoading || alerts.isLoading
+  const failed = kpis.isError || series.isError || alerts.isError
+  const hasData = (series.data?.length ?? 0) > 0
   const chartData = {
-    labels: series?.map((item: any) => item.date) ?? [],
-    datasets: [
-      {
-        label: 'kWh',
-        data: series?.map((item: any) => item.kwh) ?? [],
-        tension: 0.3,
-      },
-    ],
+    labels: series.data?.map((item) => new Date(`${item.date}T12:00:00`).toLocaleDateString('pt-BR')) ?? [],
+    datasets: [{
+      label: 'Consumo (kWh)',
+      data: series.data?.map((item) => item.kwh) ?? [],
+      borderColor: '#46d69a',
+      backgroundColor: 'rgba(70, 214, 154, .14)',
+      pointBackgroundColor: '#0b7752',
+      pointRadius: 4,
+      tension: 0.32,
+      fill: true,
+    }],
   }
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-sm text-gray-600">Total kWh</h2>
-          <p className="text-xl font-bold">{kpis?.total_energy_kwh?.toFixed(3)}</p>
+    <section>
+      <div className="page-heading page-heading-row">
+        <div>
+          <p className="eyebrow">Visão geral</p>
+          <h1>Dashboard de consumo</h1>
+          <p>Indicadores calculados a partir das leituras da sua conta.</p>
         </div>
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-sm text-gray-600">Total CO₂e (t)</h2>
-          <p className="text-xl font-bold">{kpis?.total_co2e_t?.toFixed(6)}</p>
-        </div>
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-sm text-gray-600">Média diária (kWh)</h2>
-          <p className="text-xl font-bold">{kpis?.daily_avg_kwh?.toFixed(3)}</p>
-        </div>
+        <Link className="button button-primary" to="/upload">Importar CSV</Link>
       </div>
 
-      <div className="bg-white p-4 rounded shadow mb-8">
-        <h2 className="text-lg font-bold mb-2">Consumo diário</h2>
-        <Line data={chartData} />
+      {imported && <div className="alert alert-success" role="status">Arquivo importado com sucesso.</div>}
+      {failed && <div className="alert alert-error" role="alert">Não foi possível carregar o dashboard.</div>}
+
+      <div className="kpi-grid" aria-busy={loading}>
+        <KpiCard label="Energia total" value={loading ? '—' : `${number.format(kpis.data?.total_energy_kwh ?? 0)} kWh`} tone="green" />
+        <KpiCard label="Emissões estimadas" value={loading ? '—' : `${co2.format(kpis.data?.total_co2e_t ?? 0)} tCO₂e`} tone="blue" />
+        <KpiCard label="Média diária" value={loading ? '—' : `${number.format(kpis.data?.daily_avg_kwh ?? 0)} kWh`} tone="amber" />
       </div>
 
-      <div className="bg-white p-4 rounded shadow">
-        <h2 className="text-lg font-bold mb-2">Dias em pico</h2>
-        {alerts && alerts.length > 0 ? (
-          <ul className="list-disc pl-4">
-            {alerts.map((date: string) => (
-              <li key={date}>{date}</li>
-            ))}
-          </ul>
-        ) : (
-          <p>Nenhum alerta</p>
-        )}
-      </div>
-    </div>
+      {!loading && !hasData ? (
+        <div className="card empty-state">
+          <span className="empty-icon" aria-hidden="true">↗</span>
+          <h2>Seu painel está pronto para receber dados</h2>
+          <p>Importe o arquivo de exemplo ou um CSV no formato documentado.</p>
+          <Link className="button button-primary" to="/upload">Fazer primeira importação</Link>
+        </div>
+      ) : (
+        <div className="dashboard-grid">
+          <article className="card chart-card">
+            <div className="card-heading">
+              <div><p className="eyebrow">Série histórica</p><h2>Consumo diário</h2></div>
+            </div>
+            <div className="chart-wrap">
+              <Line
+                data={chartData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false } },
+                  scales: {
+                    x: { grid: { display: false } },
+                    y: { beginAtZero: true, grid: { color: 'rgba(19, 50, 42, .08)' } },
+                  },
+                }}
+              />
+            </div>
+          </article>
+
+          <article className="card alerts-card">
+            <div className="card-heading">
+              <div><p className="eyebrow">Anomalias simples</p><h2>Dias em pico</h2></div>
+              <span className="count-badge">{alerts.data?.length ?? 0}</span>
+            </div>
+            {alerts.data?.length ? (
+              <ul className="peak-list">
+                {alerts.data.map((alert) => (
+                  <li key={alert.date}>
+                    <span><strong>{new Date(`${alert.date}T12:00:00`).toLocaleDateString('pt-BR')}</strong><small>limite {number.format(alert.threshold_kwh)} kWh</small></span>
+                    <strong>{number.format(alert.total_kwh)} kWh</strong>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="muted">Nenhum dia ficou 30% acima da média da própria semana.</p>}
+          </article>
+        </div>
+      )}
+    </section>
   )
 }
 
-export default DashboardPage
+function KpiCard({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return (
+    <article className={`card kpi-card kpi-${tone}`}>
+      <span className="kpi-dot" aria-hidden="true" />
+      <p>{label}</p>
+      <strong>{value}</strong>
+    </article>
+  )
+}

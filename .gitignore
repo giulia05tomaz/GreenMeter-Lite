@@ -1,0 +1,14 @@
+.DS_Store
+.env
+.idea/
+.vscode/
+backend/.env
+backend/vendor/
+backend/storage/*.key
+backend/storage/logs/*.log
+frontend/.env
+frontend/dist/
+frontend/node_modules/
+frontend/*.tsbuildinfo
+frontend/vite.config.d.ts
+frontend/vite.config.js
