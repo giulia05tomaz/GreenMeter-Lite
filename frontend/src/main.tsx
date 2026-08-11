@@ -7,6 +7,7 @@ import ProtectedRoute from './auth/ProtectedRoute'
 import AppLayout from './components/AppLayout'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
 import UploadPage from './pages/UploadPage'
 import './index.css'
 
@@ -23,6 +24,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/cadastro" element={<RegisterPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<DashboardPage />} />

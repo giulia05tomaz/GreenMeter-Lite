@@ -1,14 +1,15 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { apiErrorMessage } from '../lib/api'
 
 export default function LoginPage() {
-  const { authenticated, login } = useAuth()
+  const { authenticated, login, loginDemo } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [demoSubmitting, setDemoSubmitting] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -30,6 +31,20 @@ export default function LoginPage() {
     }
   }
 
+  const handleDemoLogin = async () => {
+    setDemoSubmitting(true)
+    setError('')
+
+    try {
+      await loginDemo()
+      navigate('/dashboard', { replace: true })
+    } catch (requestError) {
+      setError(apiErrorMessage(requestError, 'Não foi possível acessar a demonstração. Tente novamente.'))
+    } finally {
+      setDemoSubmitting(false)
+    }
+  }
+
   return (
     <main className="login-page">
       <section className="login-story">
@@ -46,13 +61,29 @@ export default function LoginPage() {
       </section>
 
       <section className="login-panel" aria-labelledby="login-heading">
-        <form className="auth-card" onSubmit={handleSubmit}>
+        <div className="auth-card">
           <p className="eyebrow">Acesso ao painel</p>
           <h2 id="login-heading">Bem-vinda de volta</h2>
-          <p className="muted">Use a conta configurada no seu ambiente local.</p>
+          <p className="muted">Entre com sua conta ou explore o ambiente de demonstração.</p>
 
           {error && <div className="alert alert-error" role="alert">{error}</div>}
 
+          <div className="demo-box">
+            <strong>Conheça o sistema imediatamente</strong>
+            <p>Acesse dados fictícios sem precisar de senha.</p>
+            <button
+              type="button"
+              className="button button-demo button-block"
+              onClick={handleDemoLogin}
+              disabled={demoSubmitting || submitting}
+            >
+              {demoSubmitting ? 'Iniciando demonstração…' : 'Explorar demonstração'}
+            </button>
+          </div>
+
+          <div className="divider"><span>ou entre com e-mail</span></div>
+
+          <form onSubmit={handleSubmit}>
           <label className="field">
             <span>E-mail</span>
             <input
@@ -74,10 +105,15 @@ export default function LoginPage() {
               required
             />
           </label>
-          <button className="button button-primary button-block" disabled={submitting}>
+          <button className="button button-primary button-block" disabled={submitting || demoSubmitting}>
             {submitting ? 'Entrando…' : 'Entrar'}
           </button>
-        </form>
+          </form>
+
+          <p className="auth-footer-link">
+            Não tem uma conta? <Link to="/cadastro">Criar conta</Link>
+          </p>
+        </div>
       </section>
     </main>
   )

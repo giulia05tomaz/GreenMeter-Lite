@@ -1,26 +1,27 @@
 # GreenMeter Lite
 
-MVP full stack para importar leituras de energia, acompanhar consumo e estimar emissões associadas. O projeto demonstra uma API REST autenticada, ingestão segura de CSV, isolamento de dados por usuário, visualização de séries temporais e uma regra simples para destacar picos semanais.
+Aplicação full stack para importar leituras de energia, acompanhar consumo e estimar emissões associadas. O projeto demonstra cadastro e autenticação, uma API REST, ingestão segura de CSV, isolamento por usuário, auditoria de importações e visualizações acessíveis.
 
 > Projeto de portfólio com dados demonstrativos. As estimativas não substituem um inventário de emissões certificado.
 
 ## Demo publicada
 
 - Aplicação: [GreenMeter Lite na Railway](https://strong-luck-production-00b9.up.railway.app)
-- API health check: [status do backend](https://greenmeter-lite-production.up.railway.app/up)
+- API: [health check do backend](https://greenmeter-lite-production.up.railway.app/up)
 
-As credenciais demonstrativas são mantidas fora do repositório.
+Na tela de login, **Explorar demonstração** abre uma conta somente leitura com dados fictícios. Nenhuma senha de demonstração é exposta.
 
-## O que o produto entrega
+## Principais recursos
 
-- Login com tokens Laravel Sanctum, limite de tentativas e revogação no logout.
-- Importação atômica de CSV com cabeçalho, tipo, tamanho, quantidade de linhas e valores validados.
-- KPIs de energia total, CO₂e estimado e média diária.
-- Série diária de consumo e alertas quando um dia supera em 30% a média da própria semana.
-- Separação das leituras por usuário autenticado.
-- Interface responsiva e acessível em português.
-- Testes automatizados no backend e no frontend, executados no GitHub Actions.
-- Ambiente reproduzível com Docker Compose.
+- Cadastro com validação, senha armazenada com hash e autenticação automática.
+- Login e logout com Laravel Sanctum e limite de tentativas.
+- Demonstração em um clique, identificada visualmente e bloqueada para escrita.
+- Importação atômica de CSV com validações de formato, tamanho, linhas e valores.
+- Histórico auditável de importações por usuário.
+- KPIs, série diária, filtros por período e picos comparados à média semanal.
+- Alternância entre gráfico e tabela para uma leitura acessível.
+- Especificação OpenAPI, health checks e `X-Request-ID` para rastreabilidade.
+- Testes automatizados e integração contínua.
 
 ## Stack
 
@@ -28,10 +29,9 @@ As credenciais demonstrativas são mantidas fora do repositório.
 | --- | --- |
 | Frontend | React 19, TypeScript, Vite, TanStack Query, Chart.js, Axios |
 | Backend | PHP 8.3, Laravel 13, Sanctum, Pest |
-| Dados | MySQL 8.4 em desenvolvimento; SQLite em memória nos testes |
+| Dados | MySQL 8.4; SQLite em memória nos testes |
 | Qualidade | Vitest, Testing Library, Laravel Pint, GitHub Actions |
-| Infra local | Docker e Docker Compose |
-| Deploy | Railway, FrankenPHP/Caddy e Nginx |
+| Infra | Docker Compose, Railway, FrankenPHP/Caddy e Nginx |
 
 ## Arquitetura
 
@@ -40,14 +40,14 @@ flowchart LR
     U["Pessoa usuária"] --> SPA["React SPA"]
     SPA -->|"HTTPS + Bearer token"| API["Laravel REST API"]
     API --> AUTH["Sanctum"]
-    API --> IMPORT["CSV importer"]
-    API --> DASH["Dashboard queries"]
+    API --> IMPORT["Importador CSV"]
+    API --> DASH["Consultas do dashboard"]
     AUTH --> DB[("MySQL")]
     IMPORT --> DB
     DASH --> DB
 ```
 
-A descrição das decisões e dos limites do MVP está em [docs/architecture.md](docs/architecture.md).
+Veja [arquitetura](docs/architecture.md), [modelo de ameaças](docs/threat-model.md) e [ADRs](docs/adr/).
 
 ## Executar com Docker
 
@@ -55,16 +55,11 @@ Pré-requisitos: Docker Desktop e Docker Compose.
 
 ```bash
 cp .env.example .env
-```
-
-Defina valores locais fortes para `DB_PASSWORD` e `DB_ROOT_PASSWORD`. Em seguida:
-
-```bash
 docker compose build
 docker run --rm greenmeter-lite-backend php artisan key:generate --show
 ```
 
-Copie o valor exibido para `APP_KEY` no arquivo `.env`. Para criar uma conta local de demonstração, preencha também `DEMO_ADMIN_EMAIL` e `DEMO_ADMIN_PASSWORD`. Depois execute:
+Copie a chave exibida para `APP_KEY` em `.env`, defina senhas locais fortes para o banco e execute:
 
 ```bash
 docker compose up
@@ -73,8 +68,8 @@ docker compose up
 - Frontend: `http://localhost:5173`
 - API: `http://localhost:8000`
 - Health check: `http://localhost:8000/up`
-
-Nenhuma credencial pública é criada por padrão.
+- Readiness: `http://localhost:8000/api/health/readiness`
+- OpenAPI: `http://localhost:8000/api/docs`
 
 ## Executar sem Docker
 
@@ -88,8 +83,6 @@ php artisan key:generate
 php artisan migrate --seed
 php artisan serve
 ```
-
-Configure o MySQL no `backend/.env`. A conta demo é opcional e depende das variáveis `DEMO_ADMIN_EMAIL` e `DEMO_ADMIN_PASSWORD`.
 
 ### Frontend
 
@@ -109,63 +102,52 @@ timestamp,metric,value,unit
 2026-01-01T00:00:00Z,energy,12.5,kWh
 ```
 
-Regras do MVP:
-
-- arquivo CSV/TXT de até 2 MB;
-- no máximo 10.000 leituras por importação;
-- `metric` deve ser `energy` e `unit` deve ser `kWh`;
-- `value` deve ser numérico e não negativo;
-- uma linha inválida cancela toda a importação.
-
-Um arquivo válido está disponível em [`samples/energy_readings.csv`](samples/energy_readings.csv).
+O arquivo deve ter até 2 MB e 10.000 leituras. `metric` deve ser `energy`, `unit` deve ser `kWh`, e `value` deve ser numérico e não negativo. Uma linha inválida cancela toda a operação. Baixe um exemplo em [`samples/energy_readings.csv`](samples/energy_readings.csv) ou pela própria interface.
 
 ## API
 
 | Método | Rota | Proteção | Função |
 | --- | --- | --- | --- |
+| `POST` | `/api/auth/register` | Pública + rate limit | Cria a conta e emite token |
 | `POST` | `/api/auth/login` | Pública + rate limit | Autentica e emite token |
+| `POST` | `/api/auth/demo` | Pública + rate limit | Inicia sessão demo somente leitura |
 | `GET` | `/api/auth/user` | Sanctum | Retorna a pessoa autenticada |
 | `POST` | `/api/auth/logout` | Sanctum | Revoga o token atual |
-| `POST` | `/api/readings/upload` | Sanctum | Valida e importa CSV |
+| `POST` | `/api/readings/upload` | Sanctum + bloqueio demo | Valida e importa CSV |
+| `GET` | `/api/imports` | Sanctum | Lista o histórico de importações |
 | `GET` | `/api/dashboard/kpis` | Sanctum | Retorna KPIs por período |
-| `GET` | `/api/dashboard/series` | Sanctum | Retorna série diária |
+| `GET` | `/api/dashboard/series` | Sanctum | Retorna a série diária |
 | `GET` | `/api/alerts` | Sanctum | Retorna picos semanais |
 
-Os endpoints de consulta aceitam `from` e `to` no formato `YYYY-MM-DD`.
+Os endpoints de consulta aceitam `from` e `to` em `YYYY-MM-DD`. A especificação completa está em [`docs/openapi.yaml`](docs/openapi.yaml).
 
 ## Qualidade
 
 ```bash
-# Backend
 cd backend && composer check
-
-# Frontend
 cd frontend && npm run check
 ```
 
-O workflow em `.github/workflows/ci.yml` executa lint, testes, typecheck e build em todo push para `main` e em pull requests.
+O CI executa lint, testes, typecheck e build em pushes para `main` e em pull requests.
 
 ## Segurança e privacidade
 
-- O token fica apenas em memória no frontend; não é persistido em `localStorage`.
-- Uploads têm limites e validação antes da transação no banco.
-- As consultas sempre filtram pelo usuário autenticado.
-- Segredos e arquivos `.env` são ignorados pelo Git.
-- Credenciais de demonstração não são publicadas no repositório.
-- Vulnerabilidades devem ser reportadas conforme [SECURITY.md](SECURITY.md).
+- Tokens ficam somente em memória no frontend.
+- Senhas nunca são armazenadas em texto puro.
+- Cadastro ignora qualquer tentativa de definir privilégios ou `is_demo`.
+- A conta demo é criada pelo seeder com senha aleatória e só recebe token pela rota controlada.
+- Consultas e importações são isoladas pelo `user_id` autenticado.
+- Segredos e arquivos `.env` não são versionados.
+- Consulte [SECURITY.md](SECURITY.md) para reportar vulnerabilidades.
 
-## Deploy
+## Limites e próximos passos
 
-O projeto possui configuração para frontend, API e MySQL na Railway. A topologia, as variáveis e a ordem de provisionamento estão documentadas em [`docs/deployment.md`](docs/deployment.md). Segredos nunca são versionados.
-
-## Limites atuais e próximos passos
-
-- Não há cadastro ou recuperação de senha; contas são provisionadas pelo ambiente no MVP.
-- O fator de emissão é demonstrativo e precisa de fonte/versionamento antes de uso real.
-- A detecção de pico é uma heurística, não um modelo estatístico.
-- A demo usa Serverless na Railway e pode apresentar alguns segundos de cold start após períodos sem acesso.
-- Próximas evoluções: OpenAPI, paginação/histórico de importações, observabilidade e testes end-to-end.
+- Não há recuperação ou verificação de e-mail na versão 1.0.
+- O fator de emissão é demonstrativo e precisa de fonte e versionamento para uso real.
+- A detecção de picos é uma heurística explicável, não um modelo estatístico.
+- O bundle do frontend deve receber divisão por rota em uma evolução de desempenho.
+- O próximo passo recomendado é adicionar testes end-to-end do cadastro ao dashboard.
 
 ## Material de entrevista
 
-As decisões, trade-offs e perguntas prováveis estão resumidos em [`INTERVIEW_GUIDE.md`](INTERVIEW_GUIDE.md).
+As decisões e trade-offs estão resumidos em [`INTERVIEW_GUIDE.md`](INTERVIEW_GUIDE.md).

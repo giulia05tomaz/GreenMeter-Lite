@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState, type FormEvent } from 'react'
 import {
   CategoryScale,
   Chart as ChartJS,
@@ -21,26 +22,54 @@ type Kpis = {
   daily_avg_kwh: number
 }
 type SeriesPoint = { date: string; kwh: number; co2e: number }
-type PeakAlert = { date: string; total_kwh: number; threshold_kwh: number }
+type PeakAlert = { date: string; total_kwh: number; threshold_kwh: number; week_avg_kwh: number; percent_over: number }
 
 const number = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 })
 const co2 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 6 })
 
 export default function DashboardPage() {
   const location = useLocation()
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [filters, setFilters] = useState<{ from?: string; to?: string }>({})
+  const [filterError, setFilterError] = useState('')
+  const [showTable, setShowTable] = useState(false)
   const imported = Boolean((location.state as { imported?: boolean } | null)?.imported)
   const kpis = useQuery({
-    queryKey: ['kpis'],
-    queryFn: async () => (await api.get<Kpis>('/dashboard/kpis')).data,
+    queryKey: ['kpis', filters],
+    queryFn: async () => (await api.get<Kpis>('/dashboard/kpis', { params: filters })).data,
   })
   const series = useQuery({
-    queryKey: ['series'],
-    queryFn: async () => (await api.get<SeriesPoint[]>('/dashboard/series')).data,
+    queryKey: ['series', filters],
+    queryFn: async () => (await api.get<SeriesPoint[]>('/dashboard/series', { params: filters })).data,
   })
   const alerts = useQuery({
-    queryKey: ['alerts'],
-    queryFn: async () => (await api.get<PeakAlert[]>('/alerts')).data,
+    queryKey: ['alerts', filters],
+    queryFn: async () => (await api.get<PeakAlert[]>('/alerts', { params: filters })).data,
   })
+
+  const applyFilters = (event: FormEvent) => {
+    event.preventDefault()
+    if (from && to && from > to) {
+      setFilterError('A data inicial não pode ser posterior à data final.')
+      return
+    }
+    setFilterError('')
+    setFilters({ from: from || undefined, to: to || undefined })
+  }
+
+  const clearFilters = () => {
+    setFrom('')
+    setTo('')
+    setFilterError('')
+    setFilters({})
+  }
+
+  const retryAll = () => {
+    void kpis.refetch()
+    void series.refetch()
+    void alerts.refetch()
+  }
 
   const loading = kpis.isLoading || series.isLoading || alerts.isLoading
   const failed = kpis.isError || series.isError || alerts.isError
@@ -70,8 +99,16 @@ export default function DashboardPage() {
         <Link className="button button-primary" to="/upload">Importar CSV</Link>
       </div>
 
+      <form className="card filter-bar" onSubmit={applyFilters}>
+        <label className="field"><span>De</span><input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
+        <label className="field"><span>Até</span><input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>
+        <button className="button button-primary">Aplicar período</button>
+        <button type="button" className="button button-ghost" onClick={clearFilters}>Limpar filtros</button>
+        {filterError && <div className="alert alert-error filter-error" role="alert">{filterError}</div>}
+      </form>
+
       {imported && <div className="alert alert-success" role="status">Arquivo importado com sucesso.</div>}
-      {failed && <div className="alert alert-error" role="alert">Não foi possível carregar o dashboard.</div>}
+      {failed && <div className="alert alert-error" role="alert">Não foi possível carregar o dashboard. <button className="text-button" onClick={retryAll}>Tentar novamente</button></div>}
 
       <div className="kpi-grid" aria-busy={loading}>
         <KpiCard label="Energia total" value={loading ? '—' : `${number.format(kpis.data?.total_energy_kwh ?? 0)} kWh`} tone="green" />
@@ -91,8 +128,11 @@ export default function DashboardPage() {
           <article className="card chart-card">
             <div className="card-heading">
               <div><p className="eyebrow">Série histórica</p><h2>Consumo diário</h2></div>
+              <button className="button button-ghost button-small" onClick={() => setShowTable((value) => !value)}>{showTable ? 'Ver gráfico' : 'Ver tabela'}</button>
             </div>
-            <div className="chart-wrap">
+            {showTable ? <div className="table-wrap"><table className="data-table"><caption className="visually-hidden">Consumo diário no período</caption><thead><tr><th>Data</th><th>Consumo</th><th>CO₂e estimado</th></tr></thead><tbody>
+              {series.data?.map((item) => <tr key={item.date}><td>{new Date(`${item.date}T12:00:00`).toLocaleDateString('pt-BR')}</td><td>{number.format(item.kwh)} kWh</td><td>{co2.format(item.co2e)} tCO₂e</td></tr>)}
+            </tbody></table></div> : <div className="chart-wrap">
               <Line
                 data={chartData}
                 options={{
@@ -105,7 +145,7 @@ export default function DashboardPage() {
                   },
                 }}
               />
-            </div>
+            </div>}
           </article>
 
           <article className="card alerts-card">
@@ -117,8 +157,8 @@ export default function DashboardPage() {
               <ul className="peak-list">
                 {alerts.data.map((alert) => (
                   <li key={alert.date}>
-                    <span><strong>{new Date(`${alert.date}T12:00:00`).toLocaleDateString('pt-BR')}</strong><small>limite {number.format(alert.threshold_kwh)} kWh</small></span>
-                    <strong>{number.format(alert.total_kwh)} kWh</strong>
+                    <span><strong>{new Date(`${alert.date}T12:00:00`).toLocaleDateString('pt-BR')}</strong><small>média semanal {number.format(alert.week_avg_kwh)} kWh · limite {number.format(alert.threshold_kwh)} kWh</small></span>
+                    <span><strong>{number.format(alert.total_kwh)} kWh</strong><small>+{number.format(alert.percent_over)}% acima</small></span>
                   </li>
                 ))}
               </ul>

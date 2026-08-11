@@ -1,12 +1,14 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
 import { api, setApiToken } from '../lib/api'
 
-type User = { name: string; email: string }
+export type User = { name: string; email: string; is_demo?: boolean }
 
 type AuthContextValue = {
   user: User | null
   authenticated: boolean
   login: (email: string, password: string) => Promise<void>
+  register: (name: string, email: string, password: string, passwordConfirmation: string) => Promise<void>
+  loginDemo: () => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -20,6 +22,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authenticated: user !== null,
     login: async (email, password) => {
       const response = await api.post<{ token: string; user: User }>('/auth/login', { email, password })
+      setApiToken(response.data.token)
+      setUser(response.data.user)
+    },
+    register: async (name, email, password, passwordConfirmation) => {
+      const response = await api.post<{ token: string; user: User }>('/auth/register', {
+        name,
+        email,
+        password,
+        password_confirmation: passwordConfirmation,
+      })
+      setApiToken(response.data.token)
+      setUser(response.data.user)
+    },
+    loginDemo: async () => {
+      const response = await api.post<{ token: string; user: User }>('/auth/demo')
       setApiToken(response.data.token)
       setUser(response.data.user)
     },

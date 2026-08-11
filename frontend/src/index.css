@@ -55,6 +55,9 @@ p { color: var(--muted); line-height: 1.65; }
 .button-primary:hover:not(:disabled) { background: var(--green-dark); }
 .button-ghost { border-color: var(--line); background: white; color: var(--ink); }
 .button-block { width: 100%; }
+.button-demo { border-color: #9edfc4; background: #e8f8f1; color: var(--green-dark); }
+.button-small { min-height: 34px; padding: .45rem .7rem; font-size: .78rem; }
+.text-button { padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; font-weight: 800; text-decoration: underline; }
 
 .card { border: 1px solid rgba(21,54,45,.08); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
 .alert { margin-bottom: 1.25rem; padding: .9rem 1rem; border-radius: 10px; font-size: .92rem; }
@@ -72,6 +75,18 @@ p { color: var(--muted); line-height: 1.65; }
 .auth-card h2 { margin-bottom: .25rem; font-size: 1.75rem; }
 .field { display: grid; gap: .45rem; margin: 1.2rem 0; color: var(--ink); font-size: .86rem; font-weight: 700; }
 .field input { width: 100%; height: 48px; padding: 0 .9rem; border: 1px solid #cfdcd6; border-radius: 10px; background: #fbfdfc; color: var(--ink); }
+.field input[aria-invalid="true"] { border-color: #bf5a50; }
+.field-error-text { color: #a23f35; font-size: .78rem; font-weight: 600; }
+.field-hint { color: var(--muted); font-size: .75rem; font-weight: 500; }
+.password-toggle { margin: -.4rem 0 1rem; padding: 0; border: 0; background: transparent; color: var(--green); cursor: pointer; font-weight: 700; }
+.auth-footer-link { margin: 1.3rem 0 0; text-align: center; font-size: .88rem; }
+.auth-footer-link a { color: var(--green); font-weight: 800; text-decoration: none; }
+.demo-box { margin: 1.25rem 0; padding: 1rem; border: 1px solid #bfe8d4; border-radius: 12px; background: #f0faf5; }
+.demo-box p { margin: .3rem 0 .8rem; font-size: .85rem; }
+.divider { display: flex; align-items: center; gap: .7rem; color: var(--muted); font-size: .75rem; }
+.divider::before, .divider::after { height: 1px; flex: 1; background: var(--line); content: ''; }
+.demo-banner { padding: .55rem 1rem; background: #fff2cf; color: #744c00; text-align: center; font-size: .82rem; font-weight: 800; }
+.demo-badge { padding: .25rem .45rem; border-radius: 6px; background: #fff2cf; color: #744c00; font-size: .68rem; font-weight: 900; }
 
 .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem; }
 .kpi-card { position: relative; padding: 1.35rem 1.5rem; overflow: hidden; }
@@ -104,6 +119,15 @@ p { color: var(--muted); line-height: 1.65; }
 .format-card pre { overflow-x: auto; margin: 1.25rem 0; padding: 1rem; border-radius: 10px; background: #102d25; color: #dff8ed; font-size: .8rem; line-height: 1.7; }
 .check-list { display: grid; gap: .75rem; padding-left: 1.25rem; color: var(--muted); }
 .check-list li::marker { color: var(--green); }
+.dropzone-disabled { cursor: not-allowed; opacity: .65; }
+.history-card { margin-top: 1rem; padding: 1.5rem; }
+.table-wrap { overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+.data-table th, .data-table td { padding: .75rem; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.data-table th { color: var(--muted); font-size: .74rem; text-transform: uppercase; }
+.filter-bar { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto auto; align-items: end; gap: .75rem; margin-bottom: 1rem; padding: 1rem; }
+.filter-bar .field { margin: 0; }
+.filter-error { grid-column: 1 / -1; margin: 0; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 @media (max-width: 900px) {
@@ -112,6 +136,7 @@ p { color: var(--muted); line-height: 1.65; }
   .login-panel { padding: 3rem 1rem; }
   .dashboard-grid, .content-grid { grid-template-columns: 1fr; }
   .nav-links { display: none; }
+  .filter-bar { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 650px) {
@@ -122,6 +147,7 @@ p { color: var(--muted); line-height: 1.65; }
   .kpi-grid { grid-template-columns: 1fr; }
   .login-story { padding: 2rem 1.25rem; }
   .auth-card { padding: 1.5rem; }
+  .filter-bar { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

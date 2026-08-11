@@ -16,7 +16,8 @@ class CsvReadingImporter
 
     private const MAX_ROWS = 10000;
 
-    public function import(UploadedFile $file, User $user): int
+    /** @return array{inserted: int, first_reading_at: CarbonImmutable, last_reading_at: CarbonImmutable} */
+    public function import(UploadedFile $file, User $user): array
     {
         $csv = new SplFileObject($file->getRealPath());
         $csv->setFlags(SplFileObject::READ_CSV | SplFileObject::SKIP_EMPTY | SplFileObject::DROP_NEW_LINE);
@@ -87,7 +88,13 @@ class CsvReadingImporter
             }
         });
 
-        return count($records);
+        $timestamps = collect($records)->pluck('ts');
+
+        return [
+            'inserted' => count($records),
+            'first_reading_at' => $timestamps->min(),
+            'last_reading_at' => $timestamps->max(),
+        ];
     }
 
     private function invalidRow(int $line, string $reason): never

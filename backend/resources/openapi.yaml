@@ -1,0 +1,173 @@
+openapi: 3.0.3
+info:
+  title: GreenMeter Lite API
+  version: 1.0.0
+  description: API autenticada para cadastro, importação de leituras de energia e indicadores demonstrativos.
+servers:
+  - url: https://greenmeter-lite-production.up.railway.app/api
+  - url: http://localhost:8000/api
+paths:
+  /auth/register:
+    post:
+      summary: Cria uma conta comum e emite um token Sanctum
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, password_confirmation]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 100, example: Maria Silva }
+                email: { type: string, format: email, example: maria@example.com }
+                password: { type: string, format: password, minLength: 8, example: Senha123 }
+                password_confirmation: { type: string, format: password, example: Senha123 }
+      responses:
+        '201':
+          description: Conta criada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { description: Limite de tentativas excedido }
+  /auth/login:
+    post:
+      summary: Autentica uma conta existente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, example: maria@example.com }
+                password: { type: string, format: password, example: Senha123 }
+      responses:
+        '200':
+          description: Autenticado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { description: Credenciais inválidas }
+        '429': { description: Limite de tentativas excedido }
+  /auth/demo:
+    post:
+      summary: Emite um token para a conta demonstrativa somente leitura
+      responses:
+        '200':
+          description: Demonstração autenticada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '429': { description: Limite de tentativas excedido }
+  /auth/user:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Retorna a conta autenticada
+      responses:
+        '200':
+          description: Conta atual
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { description: Não autenticado }
+  /auth/logout:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Revoga o token atual
+      responses:
+        '204': { description: Sessão encerrada }
+  /dashboard/kpis:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Retorna indicadores no período
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Indicadores calculados }
+        '401': { description: Não autenticado }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /dashboard/series:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Retorna a série diária no período
+      responses:
+        '200': { description: Série temporal }
+  /alerts:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Retorna picos acima de 130% da média semanal
+      responses:
+        '200': { description: Alertas calculados }
+  /imports:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Retorna até 50 importações da conta autenticada
+      responses:
+        '200': { description: Histórico de importações }
+  /readings/upload:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Importa um CSV de forma atômica
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200': { description: Leituras importadas }
+        '403': { description: Conta demo é somente leitura }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /health/readiness:
+    get:
+      summary: Verifica aplicação e banco
+      responses:
+        '200': { description: Aplicação pronta }
+  /samples/energy_readings.csv:
+    get:
+      summary: Baixa um CSV de exemplo
+      responses:
+        '200':
+          description: CSV
+          content:
+            text/csv: {}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    User:
+      type: object
+      required: [name, email, is_demo]
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        is_demo: { type: boolean }
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+  responses:
+    ValidationError:
+      description: Dados inválidos
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string }
+              errors:
+                type: object
+                additionalProperties:
+                  type: array
+                  items: { type: string }
+

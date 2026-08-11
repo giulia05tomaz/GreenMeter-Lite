@@ -12,7 +12,7 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    protected $fillable = ['name', 'email', 'password'];
+    protected $fillable = ['name', 'email', 'password', 'is_demo'];
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -21,11 +21,17 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_demo' => 'boolean',
         ];
     }
 
     public function readings(): HasMany
     {
         return $this->hasMany(Reading::class);
+    }
+
+    public function imports(): HasMany
+    {
+        return $this->hasMany(ImportRecord::class);
     }
 }
