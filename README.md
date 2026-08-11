@@ -24,6 +24,7 @@ MVP full stack para importar leituras de energia, acompanhar consumo e estimar e
 | Dados | MySQL 8.4 em desenvolvimento; SQLite em memória nos testes |
 | Qualidade | Vitest, Testing Library, Laravel Pint, GitHub Actions |
 | Infra local | Docker e Docker Compose |
+| Deploy | Railway, FrankenPHP/Caddy e Nginx |
 
 ## Arquitetura
 
@@ -146,12 +147,16 @@ O workflow em `.github/workflows/ci.yml` executa lint, testes, typecheck e build
 - Credenciais de demonstração não são publicadas no repositório.
 - Vulnerabilidades devem ser reportadas conforme [SECURITY.md](SECURITY.md).
 
+## Deploy
+
+O projeto possui configuração para frontend, API e MySQL na Railway. A topologia, as variáveis e a ordem de provisionamento estão documentadas em [`docs/deployment.md`](docs/deployment.md). Segredos nunca são versionados.
+
 ## Limites atuais e próximos passos
 
 - Não há cadastro ou recuperação de senha; contas são provisionadas pelo ambiente no MVP.
 - O fator de emissão é demonstrativo e precisa de fonte/versionamento antes de uso real.
 - A detecção de pico é uma heurística, não um modelo estatístico.
-- Deploy público ainda não está configurado.
+- O endereço público será incluído após a validação do primeiro deploy.
 - Próximas evoluções: OpenAPI, paginação/histórico de importações, observabilidade e testes end-to-end.
 
 ## Material de entrevista
