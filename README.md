@@ -4,6 +4,13 @@ MVP full stack para importar leituras de energia, acompanhar consumo e estimar e
 
 > Projeto de portfólio com dados demonstrativos. As estimativas não substituem um inventário de emissões certificado.
 
+## Demo publicada
+
+- Aplicação: [GreenMeter Lite na Railway](https://strong-luck-production-00b9.up.railway.app)
+- API health check: [status do backend](https://greenmeter-lite-production.up.railway.app/up)
+
+As credenciais demonstrativas são mantidas fora do repositório.
+
 ## O que o produto entrega
 
 - Login com tokens Laravel Sanctum, limite de tentativas e revogação no logout.
@@ -156,7 +163,7 @@ O projeto possui configuração para frontend, API e MySQL na Railway. A topolog
 - Não há cadastro ou recuperação de senha; contas são provisionadas pelo ambiente no MVP.
 - O fator de emissão é demonstrativo e precisa de fonte/versionamento antes de uso real.
 - A detecção de pico é uma heurística, não um modelo estatístico.
-- O endereço público será incluído após a validação do primeiro deploy.
+- A demo usa Serverless na Railway e pode apresentar alguns segundos de cold start após períodos sem acesso.
 - Próximas evoluções: OpenAPI, paginação/histórico de importações, observabilidade e testes end-to-end.
 
 ## Material de entrevista
