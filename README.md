@@ -4,6 +4,10 @@ Aplicação full stack para importar leituras de energia, acompanhar consumo e e
 
 > Projeto de portfólio com dados demonstrativos. As estimativas não substituem um inventário de emissões certificado.
 
+## Navegação
+
+[Recursos](#principais-recursos) · [Stack](#stack) · [Arquitetura](#arquitetura) · [Docker](#executar-com-docker) · [API](#api) · [Qualidade](#qualidade) · [Limites](#limites-e-próximos-passos)
+
 ## Demo publicada
 
 - Aplicação: [GreenMeter Lite na Railway](https://strong-luck-production-00b9.up.railway.app)
@@ -95,6 +99,21 @@ npm ci
 npm run dev
 ```
 
+## Estrutura do projeto
+
+```text
+backend/app/          controladores, regras de negócio e importação
+backend/routes/       rotas da API REST
+backend/tests/        testes de autenticação, importação e dashboard
+frontend/src/         páginas e componentes React/TypeScript
+docs/                 arquitetura, OpenAPI, ADRs e documentação de deploy
+samples/              CSV demonstrativo de leituras
+.github/workflows/    CI de backend e frontend
+docker-compose.yml    ambiente local com frontend, backend e banco
+```
+
+O [guia de deploy](docs/deployment.md) descreve a implantação existente. Para estudar o código, use o ambiente local; a execução local e os testes não exigem alterações na demo publicada.
+
 ## Formato do CSV
 
 ```csv
@@ -123,9 +142,16 @@ Os endpoints de consulta aceitam `from` e `to` em `YYYY-MM-DD`. A especificaçã
 
 ## Qualidade
 
-```bash
-cd backend && composer check
-cd frontend && npm run check
+Em terminais separados, a partir da raiz do projeto:
+
+```sh
+cd backend
+composer check
+```
+
+```sh
+cd frontend
+npm run check
 ```
 
 O CI executa lint, testes, typecheck e build em pushes para `main` e em pull requests.
